@@ -1,0 +1,224 @@
+---
+title: "twitter"
+output: html_document
+date: "2023-05-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r}
+#using jsonlite library as the data is in jsonl format
+library(jsonlite)
+
+#keeping the data in data and using stream_in function to read json file and convert them in data frame in R
+data <- stream_in(file("/Users/anuragrawat/monash_university/FIT5145/assignment 4/Twitter_tweets.jsonl"))
+data
+
+```
+
+```{r}
+
+#obtaining the text data 
+textdata<-data$Text
+
+```
+
+```{r}
+library(tm)
+library(tidytext)
+library(stringr)
+library(NLP)
+
+
+#====Text Cleaning====#
+#converting the tweets to ASCII to handle strange characters
+clean_data=iconv(textdata, from ="UTF-8", to ="ASCII", sub ="")
+
+#removing mentions 
+clean_data=gsub("@\\w+","",clean_data)
+
+#convert all text to lower cases
+clean_data=tolower(clean_data)
+
+
+#remove links
+clean_data=gsub("http\\S+|www\\S+", "", clean_data)
+
+
+#remove numbers
+clean_data=gsub("\\d+", "", clean_data)
+
+
+#remove punctuation
+clean_data=gsub("[[:punct:]]", "", clean_data)
+clean_data
+
+#remove single words
+clean_data=gsub("\\b[a-z]\\b{1}", replacement = " ",clean_data)
+
+
+
+```
+
+```{r}
+library(tm)
+library(tidytext)
+library(stringr)
+
+#=====Creating Corpus====#
+tweet_document=VCorpus(VectorSource(clean_data))
+
+#removing the stopwords which are present in english
+tweet_document=tm_map(tweet_document,removeWords,stopwords("english"))
+
+#removing the stemmed words
+tweet_document=tm_map(tweet_document,stemDocument)
+#removing the whitespace
+tweet_document=tm_map(tweet_document,stripWhitespace)
+
+#creating the corpus to text file
+text<- sapply(tweet_document, as.character)
+
+# Create a dataframe with the text
+text_tweet_document<- data.frame(text = unlist(text), stringsAsFactors = FALSE)
+
+
+
+```
+
+```{r}
+
+library(SentimentAnalysis)
+library(syuzhet)
+library(ggplot2)
+library(tm)
+
+
+#=====SentimentalAnalysis======#
+
+senti=analyzeSentiment(tweet_document)
+
+
+#-------------------
+#GI dictionary
+gi=senti[ ,2:4]
+
+
+gi_column=colSums(gi,na.rm=T)
+gi_column=round(gi_column,2)
+gi_column
+
+#--------creatingbarplot-----------#
+gi_column_plot=barplot(gi_column, las=1, ylim =c(0,1200), col = rainbow(3), main = "Sentiment Score")
+text(gi_column_plot,gi_column +1,gi_column, pos=3)
+box()
+
+```
+
+```{r}
+library(SentimentAnalysis)
+library(syuzhet)
+library(ggplot2)
+#-----------------------
+#HE dictionary
+hee=senti[ ,5:7]
+he_dict=colSums(hee,na.rm=T)
+he_dict=round(he_dict,2)
+he_dict
+
+#creating bar plot
+he_dict_plot=barplot(he_dict, las=1, ylim =c(0,120), col = rainbow(3), main = "Sentiment Score")
+
+text(he_dict_plot,he_dict,he_dict,pos=3)
+box()
+
+```
+
+```{r}
+library(SentimentAnalysis)
+library(syuzhet)
+library(ggplot2)
+#LM dictionary
+lmm=senti[ ,8:11]
+lmm_dict=colSums(lmm,na.rm = T)
+lmm_dict=round(lmm_dict,2)
+lmm_dict
+
+#-----------creating bar plot-----------#
+lmm_dict_plot=barplot(lmm_dict, las=1, ylim = c(-180,320), col = rainbow(13), main = "Sentimental score")
+
+text(lmm_dict_plot,lmm_dict,lmm_dict,pos=3)
+box()
+```
+
+```{r}
+library(SentimentAnalysis)
+library(syuzhet)
+library(ggplot2)
+#QDAP dictionary
+qdapp=senti [ ,12:14]
+qdapp_dict=colSums(qdapp,na.rm = T)
+qdapp_dict=round(qdapp_dict,2)
+qdapp_dict
+
+#---------creating barplot-----------#
+qdapp_dict_plot=barplot(qdapp_dict,las=1,ylim= c(0,780), col = rainbow(3), main = "Sentimental Score")
+
+text(qdapp_dict_plot,qdapp_dict+1,qdapp_dict,pos=3)
+box()
+
+
+
+```
+
+
+```
+
+```{r}
+library(sentimentr)
+library(tm)
+sentim<-sentiment(text_tweet_document$text)
+text_tweet_document$sentiment<-sentim$sentiment
+View(text_tweet_document)
+
+#creating the positive tweets
+positive_tweet<-unique(text_tweet_document[order(sentim$sentiment,decreasing = T),c(1,2)])
+
+#writing a table for positive tweets
+write.table(positive_tweet$text, file = "/Users/anuragrawat/monash_university/FIT5145/assignment 4/tweet/positive.txt",sep = "\n")
+
+#creating the negative tweets
+negative_tweet<-unique(text_tweet_document[order(sentim$sentiment),c(1,2)])
+
+#writing a table for negative tweets
+write.table(negative_tweet$text, file = "/Users/anuragrawat/monash_university/FIT5145/assignment 4/tweet/negative.txt",sep = "\n")
+
+pos_neg_tweet<-c(positive_tweet$text,negative_tweet$text)
+pos_neg_tweet
+
+#creating the corpus
+tweet_corpus<-Corpus(DirSource(directory = "/Users/anuragrawat/monash_university/FIT5145/assignment 4/tweet"))
+
+#creating the document
+tweet_corpus_document<-TermDocumentMatrix(tweet_corpus)
+
+#creating the matrix
+tweet_corpus_matrix<-as.matrix(tweet_corpus_document)
+colnames(tweet_corpus_matrix)<-c("Negative Tweets", "Positive Tweets")
+colnames(tweet_corpus_matrix)
+
+```
+
+
